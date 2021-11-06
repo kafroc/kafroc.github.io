@@ -5,32 +5,9 @@ layout: default
   <div class="post-meta">
     <span class="post-meta-span date">{{ page.date | date:"%Y %B %d" }}</span>
     
-    <span id="busuanzi_container_site_pv" class="post-meta-span pageview">
+    <span id="busuanzi_container_site_pv" class="post-meta-span pageview"  style='display:none'>
       PageView: <span id="busuanzi_container_page_pv"></span>
     </span>
-    
-    <script src="//cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
-    <script>
-        $(document).ready(
-            window.timer = setInterval(function () {
-                if (parseInt($("#busuanzi_value_site_pv").html()) {
-                    clearInterval(window.timer);
-                }
-                setInitialCount(100000);
-            }, 500);
-
-        );
-        function setInitialCount(num) {
-            var busuanziSiteOffset = parseInt(num);
-
-            if ($("#busuanzi_container_page_pv").css("display") != "none") {
-                // 同理id也可以是busuanzi_container_page_pv
-                // busuanzi_container_site_uv
-                $("#busuanzi_container_page_pv").html(parseInt($("#busuanzi_container_page_pv").html()) + busuanziSiteOffset);
-            }
-
-        }
-    </script>
     
     {% if page.tags.size > 0 %}
     <span class="post-meta-span tag">{{ page.tags | join: ', ' }}</span>
