@@ -1,0 +1,1008 @@
+---
+layout: post
+comments: true
+title: CC PART2 安全功能需求
+category: 网络安全
+keywords: CC,SFR,2022
+---
+
+## 安全需求功能简介
+CC的PART2部分是安全功能需求（Security functional requirement，简称SFR）的描述。在编写ST文档时，有一个章节就是把安全功能需求实例化。所谓实例化，是指CC PART2里的安全功能需求，实际上只是一个模板，实例化是把模板实例为实际的需求。实例化的过程有四个基本操作分别是assignment,  selection,  iteration,  and  refinement。
+
+接下来将解释这四个基本操作的用法。
+assignment是指赋值，也就是实例化需求的时候，给标注的assignment的地方赋值，用实际的实现替代。
+selection是从需求模板中指定的几个选项中选择一个。
+举一个例子，在FIA_AFL.1 Authentication failure handling中需求模板是这样的
+```
+FIA_AFL.1.1 The TSF shall detect when [selection: [assignment: positive integer 
+number], an administrator configurable positive integer 
+within[assignment: range of acceptable values]] unsuccessful
+authentication attempts occur related to [assignment: list of 
+authentication events].
+```
+本意是TOE应该有一个TSF功能，该TSF功能的需求是：当和xx有关的认证事件发生yy次认证失败尝试后
+，TSF应检测到该事件。
+
+根据该模板，实例一为“当和**用户名或密码输入错误**有关的认证事件发生**5**次认证失败尝试后，TSF应检测到该事件”。或者实例二为“当和**图片验证码输入错误**有关的认证事件发生**3-5**次认证失败尝试后，TSF应检测到该事件”
+
+以实例一来看，首先做了选择操作，从
+- [assignment: positive integer number]
+- an administrator configurable positive integer within[assignment: range of acceptable values]
+中选择了[assignment: positive integer number]
+
+另外，还做了赋值操作，把positive integer number，赋值为5。
+
+另外两个操作是iteration,  and  refinement，对于iteration一个典型的例子Class FCS: Cryptographic support，在TOE的TSF实现过程中，大概率多次用到了加密功能，比如同样是AES加密，不同的地方用到的密钥长度，密钥生成方法可能都是不一样的，这种情况下，就需要多次用到FCS_CKM，FCS_COP这两个Family的Component。这就是所谓的迭代。
+
+最后refinement是指细化，可以理解为CC PART2的所有安全功能需求，都是可以被多次细化的，所谓细化，要遵循的一个原则是细化后的安全功能需求只能比细化前的需求更严格。
+```
+FIA_AFL.1.2 When  the  defined  number  of  unsuccessful  authentication  attempts  has been [selection: met, surpassed], the TSF shall [assignment: list of actions].
+```
+以这个例子来说，安全功能需求只要求当事件发生时，需要执行指定的操作。可以细化为当事件发生时，需要执行指定的操作，以及还需要通过短信通知管理员。 通过强制通过短信通知管理员来细化该需求。这样的意义在于，当事件发生时，可采取的动作可以很多，比如记录日志，比如蜂鸣报警。而通过强制通过短信通知管理员可以更有效的保障该需求能更好的达成安全目标。
+
+## 安全需求功能串讲
+用户和TOE通信，首先要有可信信道**Class FTP: Trusted path/channels**<br>
+认证需要加解密支持**Class FCS: Cryptographic support**<br>
+有了加密支持后，进行用户身份识别和认证**Class FIA: Identification and authentication**<br>
+除了正常用户外，TOE还支持匿名访问，涉及到隐私**Class FPR: Privacy**<br>
+TOE的访问有并发限制**Class FTA: TOE access**<br>
+TOE资源有限，比如并发用户是有限的，需要合理资源利用**Class FRU: Resource utilisation**<br>
+TOE核心功能之用户数据保护**Class FDP: User data protection**<br>
+TOE核心功能之安全管理**Class FMT: Security management**<br>
+所有发送和接收的通信请求，都要防抵赖**Class FCO: Communication**<br>
+所有敏感操作都要记录日志**Class FAU: Security audit**
+TSF自保护是所有上述安全功能的基础**Class FPT: Protection of the TSF**<br>
+
+## Class FTP: Trusted path/channels
+### Inter-TSF trusted channel (FTP_ITC)
+#### FTP_ITC.1 Inter-TSF trusted channel
+可信产品之间/内部的可信信道。
+
+FTP_ITC.1.1 The  TSF  shall  provide  a  communication  channel  between  itself  and another trusted IT product that is logically distinct from other communication  channels  and  provides  assured  identification  of  its  end points and protection of the channel data from modification or disclosure.
+
+FTP_ITC.1.2 The  TSF  shall  permit  [selection:  the TSF, another trusted IT product]  to initiate communication via the trusted channel.  
+
+FTP_ITC.1.3 The TSF shall initiate communication via the trusted channel for [assignment: list of functions for which a trusted channel is required]. 
+
+### Trusted path (FTP_TRP)
+#### FTP_TRP.1 Trusted path
+TOE与其他非可信产品的可信信道，如https，rtsp over tls等。
+
+FTP_TRP.1.1 The TSF shall provide a communication path between itself and 
+[selection: remote, local] users that is logically distinct from other 
+communication  paths  and  provides  assured  identification  of  its  end 
+points and protection of the communicated data from [selection: modification, disclosure, [assignment: other types of integrity or confidentiality violation]].  
+
+FTP_TRP.1.2 The  TSF  shall  permit  [selection:  the  TSF,  local  users,  remote  users]  to initiate communication via the trusted path.  
+
+FTP_TRP.1.3 The  TSF  shall  require  the  use  of  the  trusted  path  for  [selection:  initial user  authentication,  [assignment:  other  services  for  which  trusted  path  is required]].  
+
+## Class FCS: Cryptographic support
+### Cryptographic key management (FCS_CKM)
+密钥的管理，包括密钥生成，密钥分发，密钥访问，密钥销毁等操作。
+
+#### FCS_CKM.1 Cryptographic key generation
+密钥的生成，指定密钥算法，密钥长度，以及密钥对于的标准。
+
+FCS_CKM.1.1 The TSF shall generate cryptographic keys in accordance with a specified cryptographic key generation algorithm [assignment: cryptographic key generation algorithm] and specified cryptographic key sizes [assignment: cryptographic key sizes] that meet the following: [assignment: list of standards].
+
+#### FCS_CKM.2 Cryptographic key distribution
+密钥的分发，指定密钥分发的方法和遵循的标准。
+
+FCS_CKM.2.1 The TSF shall distribute cryptographic keys in accordance with a specified cryptographic key distribution method [assignment: cryptographic key distribution method] that meets the following: [assignment: list of standards].
+
+#### FCS_CKM.3 Cryptographic key access
+密钥的访问，指定密钥访问的类型和方法，以及相关标准。
+
+FCS_CKM.3.1 The TSF shall perform [assignment:  type of cryptographic key access]  in accordance with a specified cryptographic key access method [assignment:  cryptographic  key  access  method]  that  meets  the  following: [assignment: list of standards].
+
+#### FCS_CKM.4 Cryptographic key destruction
+密钥的销毁方法和标准。
+
+FCS_CKM.4.1 The TSF shall destroy cryptographic keys in accordance with a specified cryptographic  key  destruction  method  [assignment:  cryptographic  key destruction method] that meets the following: [assignment: list of standards]. 
+
+### Cryptographic operation (FCS_COP) 
+#### FCS_COP.1  Cryptographic operation
+加密操作，利用xx算法，密码长度为yy，基于什么标准，进行什么操作（加密、解密，签名操作等）。
+
+FCS_COP.1.1 The  TSF  shall  perform  [assignment:  list  of  cryptographic  operations]  in accordance with a specified cryptographic algorithm [assignment: cryptographic algorithm] and cryptographic key sizes [assignment: cryptographic  key  sizes]  that  meet  the  following:  [assignment:  list  of standards]. 
+
+## Class FIA: Identification and authentication
+### Authentication failures (FIA_AFL)
+#### FIA_AFL.1 Authentication failure handling
+认证失败的处理，在几次认证失败后，执行什么操作。
+
+FIA_AFL.1.1 The TSF shall detect when [selection: [assignment: positive integer number], an administrator configurable positive integer within[assignment: range of acceptable values]] unsuccessful authentication attempts occur related to [assignment: list of authentication events].  
+
+FIA_AFL.1.2 When  the  defined  number  of  unsuccessful  authentication  attempts  has been [selection: met, surpassed], the TSF shall [assignment: list of actions].
+
+### User attribute definition (FIA_ATD)
+#### FIA_ATD.1 User attribute definition
+用户属性定义，包括用户所代表的组，用户拥有的权限列表等都属于用户属性。
+
+FIA_ATD.1.1 The TSF shall maintain the following list of security attributes belonging to individual users: [assignment: list of security attributes]. 
+
+### Specification of secrets (FIA_SOS)
+#### FIA_SOS.1 Verification of secrets
+校验密码，一个典型的场景是校验密码长度。
+
+FIA_SOS.1.1 The TSF shall provide a mechanism to verify that secrets meet [assignment: a defined quality metric].
+
+#### FIA_SOS.2 TSF Generation of secrets
+密码生成的规范定义，生成密码应符合指定的度量指标。
+
+FIA_SOS.2.1 The  TSF  shall  provide  a mechanism  to  generate  secrets  that meet [assignment: a defined quality metric].  
+
+FIA_SOS.2.2 The  TSF  shall  be  able  to  enforce  the  use  of  TSF  generated  secrets  for [assignment: list of TSF functions].
+
+### User authentication (FIA_UAU)
+#### FIA_UAU.1 Timing of authentication
+哪些操作允许在认证之前执行，哪些操作只能在认证之后执行。
+
+FIA_UAU.1.1 The TSF shall allow [assignment: list of TSF mediated actions] on behalf 
+of the user to be performed before the user is authenticated.  
+
+FIA_UAU.1.2 The TSF shall require each user to be successfully authenticated before allowing any other TSF-mediated actions on behalf of that user.
+
+#### FIA_UAU.2 User authentication before any action
+相比于FIA_UAU.1，本需求更严格，在用户认证之前，不允许有认可其他行为可操作。
+
+FIA_UAU.2.1 The  TSF  shall  require  each  user  to  be  successfully  authenticated  before allowing any other TSF-mediated actions on behalf of that user.
+
+#### FIA_UAU.3 Unforgeable authentication
+TOE能够识别或者阻止异常的认证请求，异常请求包括伪造的请求，以及嗅探到的请求的拷贝。
+
+FIA_UAU.3.1 The TSF shall [selection:  detect, prevent] use of authentication data that has been forged by any user of the TSF.  
+
+FIA_UAU.3.2 The TSF shall [selection:  detect, prevent] use of authentication data that has been copied from any other user of the TSF.
+
+#### FIA_UAU.4 Single-use authentication mechanisms
+认证请求防重放，单次有效。
+
+FIA_UAU.4.1 The TSF shall prevent reuse of authentication data related to [assignment: identified authentication mechanism(s)].
+
+#### FIA_UAU.5 Multiple authentication mechanisms
+TOE支持的多种认证方式，比如http的BASIC认证和DIGEST认证，Onvif的WSSE认证等等。
+
+FIA_UAU.5.1 The TSF shall provide [assignment: list of multiple authentication mechanisms] to support user authentication. 
+
+FIA_UAU.5.2 The TSF shall authenticate any user's claimed identity according to the [assignment: rules describing how the multiple authentication mechanisms provide authentication].
+
+#### FIA_UAU.6 Re-authenticating
+在什么情况下，需要用户重新认证。
+
+FIA_UAU.6.1 The TSF shall re-authenticate the user under the conditions [assignment: list of conditions under which re-authentication is required].
+
+#### FIA_UAU.7 Protected authentication feedback
+认证过程中反馈的信息，如用*号显示输入的密码长度，如认证成功无任何反馈，认证失败反馈“用户名或密码错误”
+
+FIA_UAU.7.1 The  TSF  shall  provide  only  [assignment:  list  of  feedback]  to  the  user while the authentication is in progress.
+
+### User identification (FIA_UID)
+#### FIA_UID.1 Timing of identification
+用户身份被识别之前，可以执行哪些操作，身份被识别后，可以识别哪些操作。
+
+FIA_UID.1.1 The TSF shall allow [assignment: list of TSF-mediated actions] on behalf of the user to be performed before the user is identified.  
+
+FIA_UID.1.2 The  TSF  shall  require  each  user  to  be  successfully  identified  before allowing any other TSF-mediated actions on behalf of that user.
+
+#### FIA_UID.2 User identification before any action
+比FIA_UID.1更严格，在用户身份被识别之前，不允许有任何其他操作。
+
+FIA_UID.2.1 The TSF shall require each user to be successfully identified before allowing any other TSF-mediated actions on behalf of that user.
+
+### User-subject binding (FIA_USB)
+#### FIA_USB.1 User-subject binding
+每个活动用户在TOE中维护有一个主体，主体和用户的安全属性绑定，如主体中包含用户id，用户权限列表等属性。在用户与主体的初始化关联过程中，应遵从指定的规则。主体的用户安全属性变更需遵从指定的规则。
+
+FIA_USB.1.1 The TSF shall associate the following user  security attributes with subjects  acting  on  the  behalf  of  that  user:  [assignment:  list  of  user security attributes]. 
+
+FIA_USB.1.2 The  TSF  shall  enforce  the  following  rules  on  the  initial  association  of user  security  attributes  with  subjects  acting  on  the  behalf  of  users: [assignment: rules for the initial association of attributes].  
+
+FIA_USB.1.3 The TSF shall enforce the following rules governing changes to the user security attributes associated with subjects acting on the behalf of users: [assignment: rules for the changing of attributes].
+
+## Class FPR: Privacy
+### Anonymity (FPR_ANO) 
+#### FPR_ANO.1  Anonymity
+不能识别真正操作的用户名，以保护用户的隐私。
+
+FPR_ANO.1.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable  to  determine  the  real  user  name  bound  to  [assignment:  list  of subjects and/or operations and/or objects].
+
+#### FPR_ANO.2  Anonymity without soliciting information
+相比FPR_ANO.1更严格，FPR_ANO.1可以理解为用户还是正常登录的，只是TOE无法去识别用户身份。而FPR_ANO.2是要求不征求用户信息，达到真正意义上的匿名。
+
+FPR_ANO.2.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable to determine the real user name bound to [assignment: list of subjects and/or operations and/or objects]. 
+
+FPR_ANO.2.2 The TSF shall provide [assignment: list of services] to [assignment: list of subjects] without soliciting any reference to the real user name.
+
+### Pseudonymity (FPR_PSE)
+#### FPR_PSE.1  Pseudonymity
+允许用户使用假名/别名。
+
+FPR_PSE.1.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable  to  determine  the  real  user  name  bound  to  [assignment:  list  of subjects and/or operations and/or objects]. 
+
+FPR_PSE.1.2 The TSF shall be able to provide [assignment: number of aliases] aliases of the real user name to [assignment: list of subjects].
+
+FPR_PSE.1.3 The  TSF  shall  [selection,  choose  one  of:  determine  an  alias  for  a  user, accept the alias from the user] and verify that it conforms to the [assignment: alias metric].
+
+#### FPR_PSE.2  Reversible pseudonymity
+允许TSF在指定的场景下，拥有识别别名对应的真实用户身份的的能力。
+
+FPR_PSE.2.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable  to  determine  the  real  user  name  bound  to  [assignment:  list  of subjects and/or operations and/or objects]. 
+
+FPR_PSE.2.2 The TSF shall be able to provide [assignment: number of aliases] aliases of the real user name to [assignment: list of subjects].
+
+FPR_PSE.2.3 The  TSF  shall  [selection,  choose  one  of:  determine  an  alias  for  a  user, accept the alias from the user] and verify that it conforms to the [assignment: alias metric].
+
+FPR_PSE.2.4 The TSF shall provide [selection: an authorised user, [assignment: list of trusted subjects]] a capability to determine the user identity based on the provided alias only under the following [assignment: list of conditions].
+
+#### FPR_PSE.3  Alias pseudonymity
+在指定的情况下，别名被正常使用，在其他情况下，别名无法被识别。举例来说，如果用户user拥有别名xyz，那么toe或者管理员无法通过xyz定位到user，但是当user每次访问磁盘时，日志都记录xyz访问磁盘，那这中情况下，也属于不匿名的情况，因为可以持续定位到一个相同的用户xyz访问磁盘。本需求是指在某些场景下，这种场景别名也应该无法被识别出来是同一个用户。
+
+FPR_PSE.3.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable  to  determine  the  real  user  name  bound  to  [assignment:  list  of subjects and/or operations and/or objects]. 
+
+FPR_PSE.3.2 The TSF shall be able to provide [assignment: number of aliases] aliases of the real user name to [assignment: list of subjects].
+
+FPR_PSE.3.3 The  TSF  shall  [selection,  choose  one  of:  determine  an  alias  for  a  user, accept the alias from the user] and verify that it conforms to the [assignment: alias metric].
+
+FPR_PSE.3.4 The  TSF  shall  provide  an  alias  to  the  real  user  name  which  shall  be identical to an alias provided previously under the following [assignment:  list  of  conditions]  otherwise  the  alias  provided  shall  be unrelated to previously provided aliases. 
+
+### Unlinkability (FPR_UNL) 
+#### FPR_UNL.1  Unlinkability
+实际行为和操作者没有关联性。
+
+FPR_UNL.1.1 The  TSF  shall  ensure  that  [assignment:  set  of  users  and/or  subjects]  are unable  to  determine  whether  [assignment:  list  of  operations][selection: were  caused  by  the  same  user,  are  related  as  follows[assignment:  list  of relations]].
+
+### Unobservability (FPR_UNO)
+#### FPR_UNO.1  Unobservability
+无法观察到指定的客体被指定的主体进行指定的操作。
+
+FPR_UNO.1.1 The  TSF  shall  ensure  that  [assignment:  list of users and/or subjects]  are unable to observe the operation [assignment: list of operations] on [assignment:  list of objects] by [assignment:  list of protected users and/or subjects]. 
+
+#### FPR_UNO.2  Allocation of information impacting unobservability
+指定的信息在信息的生命周期内在指定的情况下不可被观察。
+
+FPR_UNO.2.1 The  TSF  shall  ensure  that  [assignment:  list of users and/or subjects]  are unable to observe the operation [assignment: list of operations] on [assignment:  list of objects] by [assignment:  list of protected users and/or subjects].
+
+FPR_UNO.2.2 The TSF shall allocate the [assignment: unobservability related information]  among  different  parts  of  the  TOE  such  that  the  following conditions  hold  during  the  lifetime  of  the  information:  [assignment:  list of conditions]. 
+
+#### FPR_UNO.3  Unobservability without soliciting information
+为了避免隐私信息的不可观察性被破坏，此需求要求为指定主体提供的指定服务无需征求引用指定的隐私数据。
+
+FPR_UNO.3.1 The TSF shall provide [assignment: list of services] to [assignment: list of subjects]  without  soliciting  any  reference  to  [assignment:  privacy related information].  
+
+#### FPR_UNO.4  Authorised user observability
+指定用户拥有观察指定资源和服务的能力。
+
+FPR_UNO.4.1 The  TSF  shall  provide  [assignment:  set  of  authorised  users]  with  the capability  to  observe  the  usage  of  [assignment:  list  of  resources  and/or services].  
+
+## Class FTA: TOE access
+### Limitation on scope of selectable attributes (FTA_LSA)
+#### FTA_LSA.1 Limitation on scope of selectable attributes
+基于指定的属性来限制会话安全属性。举例来说，正常用户在工作时间登录，则会话安全属性：角色 为管理员，如果非工作时间登录，则角色为普通用户。
+
+FTA_LSA.1.1 The TSF shall restrict the scope of the session security attributes [assignment: session security attributes], based on [assignment: attributes].
+
+### Limitation on multiple concurrent sessions (FTA_MCS)
+#### FTA_MCS.1  Basic limitation on multiple concurrent sessions
+针对同一用户，设置并发会话数量上限。
+
+FTA_MCS.1.1 The TSF shall restrict the maximum number of concurrent sessions that belong to the same user.  
+
+FTA_MCS.1.2 The TSF shall enforce, by default, a limit of [assignment: default number] sessions per user.
+
+#### FTA_MCS.2  Per user attribute limitation on multiple concurrent sessions
+针对同一用户，基于指定的规则设置并发会话数量上限。比如管理员的并发上限是20，普通用户的上限是10。
+
+FTA_MCS.2.1 The  TSF  shall  restrict  the  maximum  number  of  concurrent  sessions  that belong  to  the  same  user  according  to  the  rules  [assignment:  rules  for  the number of maximum concurrent sessions]. 
+
+FTA_MCS.2.2 The  TSF  shall  enforce,  by  default,  a  limit  of  [assignment:  default  number] sessions per user.
+
+### Session locking and termination (FTA_SSL)
+#### FTA_SSL.1 TSF-initiated session locking
+TSF发起的会话锁定，比如用户多久没操作后，TSF锁定会话，无法读写数据/无法访问页面等。
+
+FTA_SSL.1.1 The TSF shall lock an interactive session after [assignment: time interval 
+of user inactivity] by:  <br>
+    a) clearing or overwriting display devices, making the current contents unreadable;  <br>
+    b) disabling  any  activity  of  the  user's  data  access/display  devices other than unlocking the session.  
+
+FTA_SSL.1.2 The  TSF  shall  require  the  following  events  to  occur  prior  to  unlocking the session: [assignment: events to occur]. 
+
+#### FTA_SSL.2 User-initiated locking
+用户发起的锁定，一个简单的例子是在Windows下，用户主动按Win + L键进行锁定。直到用户重新输入密码后才可重新操作。
+
+FTA_SSL.2.1 The  TSF  shall  allow  user-initiated  locking  of  the  user's  own  interactive session, by:  
+    a) clearing or overwriting display devices, making the current contents unreadable;  
+    b) disabling  any  activity  of  the  user's  data  access/display  devices other than unlocking the session.  
+
+FTA_SSL.2.2 The  TSF  shall  require  the  following  events  to  occur  prior  to  unlocking the session: [assignment: events to occur].
+
+#### FTA_SSL.3 TSF-initiated termination
+指定的时间内用户没有任何活动，则TSF主动断开会话。
+
+FTA_SSL.3.1 The TSF shall terminate an interactive session after a [assignment:  time interval of user inactivity].
+
+#### FTA_SSL.4 User-initiated termination
+用户主动断开会话，一个简单的例子是用户点击shutdown关闭操作系统、直接关闭网页等。
+
+FTA_SSL.4.1 The TSF shall allow user-initiated termination of the user's own interactive session.
+
+### TOE access banners (FTA_TAB)
+#### FTA_TAB.1  Default TOE access banners
+在用户建立会话之前，TSF应提示给用户未授权操作的警告。
+
+FTA_TAB.1.1 Before  establishing  a  user  session,  the  TSF  shall  display  an  advisory warning message regarding unauthorised use of the TOE. 
+
+### TOE access history (FTA_TAH)
+#### FTA_TAH.1  TOE access history
+在成功建立会话后，TSF应给用户展示最后一次成功会话的指定信息，最后一次失败会话的指定信息，以及最后一次成功会话至今的所有失败会话数量。TSF在给用户预览会话历史信息前，不允许删除会话历史信息。
+
+FTA_TAH.1.1 Upon successful session establishment, the TSF shall display the [selection:  date,  time,  method,  location]  of  the  last  successful  session establishment to the user.  
+
+FTA_TAH.1.2 Upon successful session establishment, the TSF shall display the [selection: date, time, method, location] of the last unsuccessful attempt to session establishment and the number of unsuccessful attempts since the last successful session establishment.  
+
+FTA_TAH.1.3 The  TSF  shall  not  erase  the  access  history  information  from  the  user interface without giving the user an opportunity to review the information.
+
+### TOE session establishment (FTA_TSE)
+#### FTA_TSE.1 TOE session establishment
+在指定的属性下，TOE应有能力拒绝会话的建立。比如在非工作时间，禁止用户的登录建立会话。
+
+FTA_TSE.1.1 The TSF shall be able to deny session establishment based on [assignment: attributes]. 
+
+关于安全功能需求，CC PART2能罗列的也是有限的。就会话而言，有很多其他安全功能需求可以添加，比如会话的id生成机制，会话id的随机性要求，会话与客户端ip的绑定等等。CC是允许扩展安全功能需求的。从CLASS，FAMILY到COMPONENT。
+
+## Class FRU: Resource utilisation
+### Fault tolerance (FRU_FLT)
+#### FRU_FLT.1 Degraded fault tolerance
+在指定的错误类型发生时，指定的TOE能力仍然需要提供正常服务。即容忍错误的可用性能力。
+
+FRU_FLT.1.1 The TSF shall ensure the operation of [assignment: list of TOE capabilities] when the following failures occur: [assignment: list of type of failures]. 
+
+#### FRU_FLT.2 Limited fault tolerance
+在指定的错误类型发生时，TOE的所有能力仍然需要提供正常服务。
+
+FRU_FLT.2.1 The  TSF  shall  ensure  the  operation  of  all  the  TOE's  capabilities  when  the following failures occur: [assignment: list of type of failures].
+
+### Priority of service (FRU_PRS)
+#### FRU_PRS.1  Limited priority of service
+每个主体都应赋值一个优先级，对指定的资源，都应该基于主体的优先级进行调节。
+
+FRU_PRS.1.1 The TSF shall assign a priority to each subject in the TSF.  
+
+FRU_PRS.1.2 The TSF shall ensure that each access to [assignment: controlled resources] shall be mediated on the basis of the subjects assigned priority. 
+
+#### FRU_PRS.2  Full priority of service
+每个主体都应赋值一个优先级，对所有的共享资源，都应该基于主体的优先级进行调节。
+
+FRU_PRS.2.1 The TSF shall assign a priority to each subject in the TSF. 
+
+FRU_PRS.2.2 The  TSF  shall  ensure  that  each  access  to  all  shareable  resources  shall  be mediated on the basis of the subjects assigned priority.
+
+### Resource allocation (FRU_RSA)
+#### FRU_RSA.1  Maximum quotas
+TSF应限制指定的用户在指定的时间段内对指定的资源的最大使用量。
+
+FRU_RSA.1.1 The  TSF  shall  enforce  maximum  quotas  of  the  following  resources: [assignment: controlled resources] that [selection: individual user, defined group of users, subjects] can use [selection: simultaneously, over a specified period of time].
+
+#### FRU_RSA.2  Minimum and maximum quotas
+TSF应限制指定的用户在指定的时间段内对指定的资源的最大使用量，以及最小的供应量。
+
+FRU_RSA.2.1 The TSF shall enforce maximum quotas of the following resources [assignment:  controlled  resources]  that  [selection:  individual  user,  defined group of users, subjects] can use [selection: simultaneously, over a specified period of time]. 
+
+FRU_RSA.2.2 The TSF shall ensure the provision of minimum quantity of each [assignment: controlled  resource] that is available for [selection: an individual user, defined group of users, subjects] to use [selection: simultaneously, over a specified period of time].
+
+## Class FDP: User data protection
+### Access control policy (FDP_ACC)
+策略讲的是应该做什么，比如指定的主体对指定的客体进行指定的操作应遵循指定的访问控制策略。访问控制策略的对象是主体，客体，以及主体对客体的操作。
+
+#### FDP_ACC.1  Subset access control 
+对指定的主体，客体，以及主体对客体的操作应用指定的访问控制策略。
+
+FDP_ACC.1.1 The TSF shall enforce the [assignment: access control SFP] on [assignment:  list  of  subjects,  objects,  and  operations  among  subjects  and objects covered by the SFP]. 
+
+#### FDP_ACC.2  Complete access control
+对指定的主体，客体，应用指定的访问控制策略。对任意的受TSF控制的主客体均被SFP覆盖。
+
+FDP_ACC.2.1 The TSF shall enforce the [assignment: access control SFP] on [assignment: list  of  subjects  and  objects]  and  all  operations  among  subjects  and  objects covered by the SFP. 
+
+FDP_ACC.2.2 The TSF shall ensure that all operations between any subject controlled by  the  TSF  and  any  object  controlled  by  the  TSF  are  covered  by  an access control SFP.
+
+### Access control functions (FDP_ACF)
+功能讲的是应该怎么做，比如基于主客体的安全属性，进行怎么样的访问控制判断。
+
+#### FDP_ACF.1  Security attribute based access control
+基于安全属性的访问控制，比如主体有安全属性，客体也有安全属性，主体对客体的访问过程中，由指定的访问控制策略决定是否可执行访问。
+
+FDP_ACF.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP]  to  objects based on the following: [assignment: list of subjects and objects controlled under the indicated SFP, and for each, the SFP-relevant security attributes, or named groups of SFP-relevant security attributes].  
+
+FDP_ACF.1.2 The  TSF  shall  enforce  the  following  rules  to  determine  if  an  operation among controlled subjects and controlled objects is allowed: [assignment: rules governing access among controlled subjects and controlled objects using controlled operations on controlled objects].  
+
+FDP_ACF.1.3 The TSF shall explicitly authorise access of subjects to objects based on the following additional rules: [assignment: rules,  based  on  security attributes, that explicitly authorise access of subjects to objects].  
+
+FDP_ACF.1.4 The  TSF  shall  explicitly  deny  access  of  subjects  to  objects  based  on  the following additional rules: [assignment: rules, based on security attributes, that explicitly deny access of subjects to objects]. 
+
+### Data authentication (FDP_DAU)
+#### FDP_DAU.1  Basic Data Authentication
+提供主体校验客体信息有效性的能力。
+
+FDP_DAU.1.1 The TSF shall provide a capability to generate evidence that can be used as a guarantee of the validity of [assignment: list of objects or information types].  
+
+FDP_DAU.1.2 The  TSF  shall  provide  [assignment:  list  of  subjects]  with  the  ability  to verify evidence of the validity of the indicated information.  
+
+#### FDP_DAU.2  Data Authentication with Identity of Guarantor 
+提供主体校验客体信息以及客体信息的担保人信息有效性的能力。
+
+FDP_DAU.2.1 The TSF shall provide a capability to generate evidence that can be used as a guarantee of the validity of [assignment: list of objects or information types]. 
+
+FDP_DAU.2.2 The TSF shall provide [assignment: list of subjects] with the ability to verify evidence of the validity of the indicated information and the identity of the user that generated the evidence.
+
+### Export from the TOE (FDP_ETC)
+#### FDP_ETC.1  Export of user data without security attributes
+FDP_ETC.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  when  exporting  user  data,  controlled under the SFP(s), outside of the TOE.  
+
+FDP_ETC.1.2 The  TSF  shall  export  the  user  data  without  the  user  data's  associated security attributes  
+
+#### FDP_ETC.2  Export of user data with security attributes 
+FDP_ETC.2.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  when  exporting  user  data,  controlled under the SFP(s), outside of the TOE.  
+
+FDP_ETC.2.2 The  TSF  shall  export  the  user  data  with  the  user  data's  associated security attributes.  
+
+FDP_ETC.2.3 The TSF shall ensure that the security attributes, when exported outside the TOE, are unambiguously associated with the exported user data.  
+
+FDP_ETC.2.4 The  TSF  shall  enforce  the  following  rules  when  user  data  is  exported from the TOE: [assignment: additional exportation control rules]. 
+
+### Information flow control policy (FDP_IFC)
+策略讲的是要做什么。数据流控制策略的对象是主体，信息和导致信息流入流出主体的操作。访问控制策略和信息流控制策略的区别在于，访问控制策略的对象是客体，而客体的属性是可以被变动的，符合DAC自主访问控制的模式。而信息流控制策略的对象是信息，信息的属性在没有显式授权的前提下，是无法被改动的，符合MAC强制访问控制的模式。MAC的意思是对于所有普通用户而言，访问控制规则必须遵守，而管理员/超级用户可以修改这个规则。而相对于DAC来说，所有的用户可以自主设置属于自己的资源的访问控制策略。
+
+#### FDP_IFC.1 Subset information flow control
+FDP_IFC.1.1 The TSF shall enforce the [assignment: information flow control SFP] on [assignment: list of subjects, information, and operations that cause controlled  information  to  flow  to  and  from  controlled  subjects  covered  by the SFP].  
+
+#### FDP_IFC.2 Complete information flow control 
+FDP_IFC.2.1 The  TSF  shall  enforce  the  [assignment:  information  flow  control  SFP]  on [assignment:  list  of  subjects  and  information]  and  all  operations  that  cause that information to flow to and from subjects covered by the SFP. 
+
+FDP_IFC.2.2 The  TSF  shall  ensure  that  all  operations  that  cause  any  information  in the TOE to flow to and from any subject in the TOE are covered by an information flow control SFP.
+
+### Information flow control functions (FDP_IFF)
+#### FDP_IFF.1 Simple security attributes
+FDP_IFF.1.1 The  TSF  shall  enforce  the  [assignment:  information  flow  control  SFP] based on the following types of subject and information security attributes:  [assignment:  list  of  subjects  and  information  controlled under the indicated SFP, and for each, the security attributes].  
+
+FDP_IFF.1.2 The TSF shall permit an information flow between a controlled subject and  controlled  information  via  a  controlled  operation  if  the  following rules  hold:  [assignment:  for  each  operation,  the  security  attribute-based relationship that must hold between subject and information security attributes].  
+
+FDP_IFF.1.3 The TSF shall enforce the [assignment: additional  information  flow control SFP rules].  
+
+FDP_IFF.1.4 The  TSF  shall  explicitly  authorise  an  information  flow  based  on  the following  rules:  [assignment: rules,  based  on  security  attributes,  that explicitly authorise information flows].  
+
+FDP_IFF.1.5 The TSF shall explicitly deny an information flow based on the following rules: [assignment:  rules, based on security attributes, that explicitly deny information flows].  
+
+#### FDP_IFF.2 Hierarchical security attributes
+FDP_IFF.2.1 The TSF shall enforce the [assignment: information flow control SFP] based on the following types of subject and information security attributes: [assignment:  list  of  subjects  and  information  controlled  under  the  indicated SFP, and for each, the security attributes]. 
+
+FDP_IFF.2.2 The  TSF  shall  permit  an  information  flow  between  a  controlled  subject  and controlled  information  via  a  controlled  operation  if  the  following  rules, based  on  the  ordering  relationships  between  security  attributes  hold: [assignment:  for  each  operation,  the  security  attribute-based  relationship that must hold between subject and information security attributes]. 
+
+FDP_IFF.2.3 The  TSF  shall  enforce  the  [assignment:  additional  information  flow  control SFP rules]. 
+
+DP_IFF.2.4 The TSF shall explicitly authorise an information flow based on the following rules: [assignment: rules, based on security attributes, that explicitly authorise information flows]. 
+
+FDP_IFF.2.5 The  TSF  shall  explicitly  deny  an  information  flow  based  on  the  following rules:  [assignment:  rules,  based  on  security  attributes,  that  explicitly  deny information flows]. 
+
+FDP_IFF.2.6 The  TSF  shall  enforce  the  following  relationships  for  any  two  valid information flow control security attributes:  
++ a) There  exists  an  ordering  function  that,  given  two  valid  security attributes,  determines  if  the  security  attributes  are  equal,  if  one security  attribute  is  greater  than  the  other,  or  if  the  security attributes are incomparable; and  
++ b) There  exists  a  “least  upper  bound”  in  the  set  of  security attributes,  such  that,  given  any  two  valid  security  attributes, there is a valid security attribute that is greater than or equal to the two valid security attributes; and  
++ c) There  exists  a  “greatest  lower  bound”  in  the  set  of  security attributes,  such  that,  given  any  two  valid  security  attributes, there is a valid security attribute that is not greater than the two valid security attributes.
+
+#### FDP_IFF.3 Limited illicit information flows
+有限的非法信息流。
+
+FDP_IFF.3.1 The TSF shall enforce the [assignment: information flow control SFP] to limit  the  capacity  of  [assignment:  types  of  illicit  information  flows]  to  a [assignment: maximum capacity].
+
+#### FDP_IFF.4 Partial elimination of illicit information flows
+部分禁止非法信息流。
+
+FDP_IFF.4.1 The  TSF  shall  enforce  the  [assignment:  information  flow  control  SFP]  to limit  the  capacity  of  [assignment:  types  of  illicit  information  flows]  to  a [assignment: maximum capacity]. 
+
+FDP_IFF.4.2 The TSF shall prevent [assignment: types of illicit information flows].
+
+#### FDP_IFF.5 No illicit information flows
+完全杜绝非法信息流。
+
+FDP_IFF.5.1 The TSF shall ensure that no illicit information flows exist to circumvent [assignment: name of information flow control SFP].
+
+#### FDP_IFF.6 Illicit information flow monitoring
+非法信息流的监控。
+
+FDP_IFF.6.1 The TSF shall enforce the [assignment: information flow control SFP] to monitor  [assignment:  types  of  illicit  information  flows]  when  it  exceeds the [assignment: maximum capacity].
+
+### Import from outside of the TOE (FDP_ITC)
+#### FDP_ITC.1 Import of user data without security attributes
+FDP_ITC.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  when  importing  user  data,  controlled under the SFP, from outside of the TOE.  
+
+FDP_ITC.1.2 The  TSF  shall  ignore  any  security  attributes  associated  with  the  user data when imported from outside the TOE.  
+
+FDP_ITC.1.3 The  TSF  shall  enforce  the  following  rules  when  importing  user  data controlled under the SFP from outside the TOE: [assignment: additional importation control rules].
+
+#### FDP_ITC.2 Import of user data with security attributes
+FDP_ITC.2.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  when  importing  user  data,  controlled under the SFP, from outside of the TOE.  
+
+FDP_ITC.2.2 The  TSF  shall  use  the  security  attributes  associated  with  the  imported user data.  
+
+FDP_ITC.2.3 The TSF shall ensure that the protocol used provides for the unambiguous  association  between  the  security  attributes  and  the  user data received.  
+
+FDP_ITC.2.4 The TSF shall ensure that interpretation of the security attributes of the imported user data is as intended by the source of the user data.  
+
+FDP_ITC.2.5 The  TSF  shall  enforce  the  following  rules  when  importing  user  data controlled under the SFP from outside the TOE: [assignment: additional importation control rules].
+
+### Internal TOE transfer (FDP_ITT)
+#### FDP_ITT.1 Basic internal transfer protection
+FDP_ITT.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  to  prevent  the  [selection:  disclosure, modification,  loss  of  use]  of  user  data  when  it  is  transmitted  between physically-separated parts of the TOE. 
+
+#### FDP_ITT.2 Transmission separation by attribute
+FDP_ITT.2.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information  flow  control  SFP(s)]  to  prevent  the  [selection:  disclosure, modification,  loss  of  use]  of  user  data  when  it  is  transmitted  between physically-separated parts of the TOE.
+
+FDP_ITT.2.2 The TSF shall separate data controlled by the SFP(s) when transmitted 
+between  physically-separated  parts  of  the  TOE,  based  on  the  values  of 
+the following: [assignment: security attributes that require separation]. 
+
+#### FDP_ITT.3 Integrity monitoring
+FDP_ITT.3.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information flow control SFP(s)] to monitor user data transmitted between physically-separated parts of the TOE for the following errors: [assignment: integrity errors].  
+
+FDP_ITT.3.2 Upon  detection  of  a  data  integrity  error,  the  TSF  shall  [assignment: specify the action to be taken upon integrity error].  
+
+#### FDP_ITT.4 Attribute-based integrity monitoring
+FDP_ITT.4.1 The TSF shall enforce the [assignment: access control SFP(s) and/or information  flow  control  SFP(s)]  to  monitor  user  data  transmitted  between physically-separated parts of the TOE for the following errors: [assignment: integrity  errors],  based on  the following  attributes:  [assignment:  security attributes that require separate transmission channels]. 
+
+FDP_ITT.4.2 Upon  detection  of  a  data  integrity  error,  the  TSF  shall  [assignment:  specify the action to be taken upon integrity error].
+
+### Residual information protection (FDP_RIP)
+#### FDP_RIP.1 Subset residual information protection
+FDP_RIP.1.1 The TSF shall ensure that any previous information content of a resource is made unavailable upon the [selection: allocation of the resource  to,  deallocation  of  the  resource  from]  the  following  objects: [assignment: list of objects]. 
+
+#### FDP_RIP.2 Full residual information protection
+FDP_RIP.2.1 The TSF shall  ensure that any previous information content of a resource is made unavailable upon the [selection: allocation of the resource to, deallocation of the resource from] all objects.
+
+### Rollback (FDP_ROL)
+#### FDP_ROL.1  Basic rollback
+FDP_ROL.1.1 The TSF shall enforce [assignment: access control SFP(s) and/or information flow control SFP(s)] to permit the rollback of the [assignment:  list  of  operations]  on  the  [assignment:  information  and/or list of objects].  
+
+FDP_ROL.1.2 The TSF shall permit operations to be rolled back within the [assignment: boundary limit to which rollback may be performed].
+
+#### FDP_ROL.2  Advanced rollback
+FDP_ROL.2.1 The TSF shall enforce [assignment: access control SFP(s) and/or information flow control SFP(s)] to permit the rollback of all the operations on the [assignment: list of objects]. 
+
+FDP_ROL.2.2 The  TSF  shall  permit  operations  to  be  rolled  back  within  the  [assignment: boundary limit to which rollback may be performed].
+
+### Stored data integrity (FDP_SDI)
+#### FDP_SDI.1 Stored data integrity monitoring
+FDP_SDI.1.1 The  TSF  shall  monitor  user  data  stored  in  containers  controlled  by  the TSF for [assignment: integrity errors] on all objects, based on the following attributes: [assignment: user data attributes].
+
+#### FDP_SDI.2 Stored data integrity monitoring and action
+FDP_SDI.2.1 The  TSF  shall  monitor  user  data  stored  in  containers  controlled  by  the  TSF for  [assignment:  integrity  errors]  on  all  objects,  based  on  the  following attributes: [assignment: user data attributes]. 
+
+FDP_SDI.2.2 Upon  detection  of  a  data  integrity  error,  the  TSF  shall  [assignment: action to be taken].
+
+### Inter-TSF user data confidentiality transfer protection (FDP_UCT)
+#### FDP_UCT.1  Basic data exchange confidentiality
+FDP_UCT.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information flow control SFP(s)] to [selection: transmit, receive] user data in a manner protected from unauthorised disclosure. 
+
+### Inter-TSF user data integrity transfer protection (FDP_UIT)
+#### FDP_UIT.1 Data exchange integrity
+FDP_UIT.1.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information flow control SFP(s)] to [selection: transmit, receive] user data in  a  manner  protected  from  [selection:  modification,  deletion,  insertion, replay] errors.  
+
+FDP_UIT.1.2 The  TSF  shall  be  able  to  determine  on  receipt  of  user  data,  whether [selection: modification, deletion, insertion, replay] has occurred.
+
+#### FDP_UIT.2 Source data exchange recovery
+FDP_UIT.2.1 The  TSF  shall  enforce  the  [assignment:  access  control  SFP(s)  and/or information flow control SFP(s)] to be able to recover from [assignment: list of recoverable errors] with the help of the source trusted IT product.
+
+#### FDP_UIT.3 Destination data exchange recovery
+FDP_UIT.3.1 The TSF shall enforce the [assignment: access control SFP(s) and/or information flow control SFP(s)] to be able to recover from [assignment: list of recoverable errors] without any help from the source trusted IT product.
+
+## Class FMT: Security management
+### Management of functions in TSF (FMT_MOF)
+#### FMT_MOF.1 Management of security functions behaviour
+FMT_MOF.1.1 The TSF shall restrict the ability to [selection: determine the behaviour of, disable, enable, modify the behaviour of] the functions [assignment: list of functions] to [assignment: the authorised identified roles].
+
+### Management of security attributes (FMT_MSA)
+#### FMT_MSA.1 Management of security attributes
+FMT_MSA.1.1 The TSF shall enforce the [assignment: access control SFP(s), information  flow  control  SFP(s)]  to  restrict  the  ability  to  [selection: change_default, query, modify, delete, [assignment: other operations]]  the security attributes [assignment: list of security attributes] to [assignment: the authorised identified roles].
+
+#### FMT_MSA.2 Secure security attributes
+FMT_MSA.2.1 The TSF shall ensure that only secure values are accepted for [assignment: list of security attributes]. 
+
+#### FMT_MSA.3 Static attribute initialisation
+FMT_MSA.3.1 The  TSF  shall  enforce  the  [assignment:  access control SFP, information flow control SFP] to provide [selection, choose one of: restrictive, permissive, [assignment: other property]] default values for security attributes that are used to enforce the SFP.  
+
+FMT_MSA.3.2 The  TSF  shall  allow  the  [assignment:  the  authorised  identified  roles]  to specify  alternative  initial  values  to  override  the  default  values  when  an object or information is created. 
+
+#### FMT_MSA.4 Security attribute value inheritance
+FMT_MSA.4.1 The TSF shall use the following rules to set the value of security attributes: [assignment: rules for setting the values of security attributes]
+
+### Management of TSF data (FMT_MTD)
+#### FMT_MTD.1  Management of TSF data
+FMT_MTD.1.1 The  TSF  shall  restrict  the  ability  to  [selection:  change_default,  query, modify, delete, clear, [assignment: other operations]] the [assignment: list of TSF data] to [assignment: the authorised identified roles]. 
+
+#### FMT_MTD.2  Management of limits on TSF data
+FMT_MTD.2.1 The TSF shall restrict the specification of the limits for [assignment:  list of TSF data] to [assignment: the authorised identified roles].  
+
+FMT_MTD.2.2 The  TSF  shall  take  the  following  actions,  if  the  TSF  data  are  at,  or exceed, the indicated limits: [assignment: actions to be taken]. 
+
+#### FMT_MTD.3  Secure TSF data
+FMT_MTD.3.1 The TSF shall ensure that only secure values are accepted for [assignment: list of TSF data]. 
+
+### Revocation (FMT_REV)
+#### FMT_REV.1  Revocation
+FMT_REV.1.1 The  TSF  shall  restrict  the  ability  to  revoke  [assignment:  list  of  security attributes] associated with the [selection: users, subjects, objects, [assignment: other additional resources]] under the control of the TSF to [assignment: the authorised identified roles].  
+
+FMT_REV.1.2 The  TSF  shall  enforce  the  rules  [assignment:  specification  of  revocation rules]. 
+
+### Security attribute expiration (FMT_SAE)
+#### FMT_SAE.1  Time-limited authorisation 
+FMT_SAE.1.1 The  TSF  shall  restrict  the  capability  to  specify  an  expiration  time  for [assignment: list of security attributes for which expiration is to be supported] to [assignment: the authorised identified roles].  
+
+FMT_SAE.1.2 For each of these security attributes, the TSF shall be able to [assignment:  list  of  actions  to  be  taken  for  each  security  attribute]  after the expiration time for the indicated security attribute has passed.
+
+### Specification of Management Functions (FMT_SMF)
+#### FMT_SMF.1  Specification of Management Functions
+FMT_SMF.1.1 The  TSF  shall  be  capable  of  performing  the  following  management functions: [assignment: list of management functions to be provided by the TSF].
+
+### Security management roles (FMT_SMR)
+#### FMT_SMR.1 Security roles
+FMT_SMR.1.1 The  TSF  shall  maintain  the  roles  [assignment:  the  authorised  identified roles].  
+
+FMT_SMR.1.2 The TSF shall be able to associate users with roles.
+
+#### FMT_SMR.2 Restrictions on security roles
+FMT_SMR.2.1 The TSF shall maintain the roles: [assignment: authorised identified roles]. 
+
+FMT_SMR.2.2 The TSF shall be able to associate users with roles. 
+
+FMT_SMR.2.3 The TSF shall ensure that the conditions [assignment:  conditions for the different roles] are satisfied.
+
+#### FMT_SMR.3 Assuming roles
+FMT_SMR.3.1 The TSF shall require an explicit request to assume the following roles: [assignment: the roles].
+
+## Class FCO: Communication
+### Non-repudiation of origin (FCO_NRO) 
+#### FCO_NRO.1 Selective proof of origin
+FCO_NRO.1.1 The  TSF  shall  be  able  to  generate  evidence  of  origin  for  transmitted [assignment:  list  of  information  types]  at  the  request  of  the  [selection: originator, recipient, [assignment: list of third parties]].  
+
+FCO_NRO.1.2 The  TSF  shall be  able to  relate  the  [assignment:  list of attributes]  of the originator  of  the  information,  and  the  [assignment:  list  of  information fields] of the information to which the evidence applies.  
+
+FCO_NRO.1.3 The  TSF  shall  provide  a  capability  to  verify  the  evidence  of  origin  of information  to  [selection:  originator,  recipient,  [assignment:  list  of  third parties]] given [assignment: limitations on the evidence of origin]. 
+
+#### FCO_NRO.2 Enforced proof of origin
+FCO_NRO.2.1 The TSF shall  enforce the generation of evidence of origin  for transmitted [assignment: list of information types] at all times. 
+
+FCO_NRO.2.2 The  TSF  shall  be  able  to  relate  the  [assignment:  list  of  attributes]  of  the originator of the information, and the [assignment:  list of information fields] of the information to which the evidence applies. 
+
+FCO_NRO.2.3 The  TSF  shall  provide  a  capability  to  verify  the  evidence  of  origin  of information  to  [selection:  originator,  recipient,  [assignment:  list  of  third parties]] given [assignment: limitations on the evidence of origin].
+
+### Non-repudiation of receipt (FCO_NRR)
+#### FCO_NRR.1 Selective proof of receipt 
+FCO_NRR.1.1 The  TSF  shall  be  able  to  generate  evidence  of  receipt  for  received [assignment:  list  of  information  types]  at  the  request  of  the  [selection: originator, recipient, [assignment: list of third parties]].  
+
+FCO_NRR.1.2 The  TSF  shall be  able to  relate  the  [assignment:  list of attributes]  of the recipient  of  the  information,  and  the  [assignment:  list  of  information fields] of the information to which the evidence applies.  
+
+FCO_NRR.1.3 The  TSF  shall  provide  a  capability  to  verify  the  evidence  of  receipt  of information  to  [selection:  originator,  recipient,  [assignment:  list  of  third parties]] given [assignment: limitations on the evidence of receipt].  
+
+#### FCO_NRR.2 Enforced proof of receipt 
+FCO_NRR.2.1 The  TSF  shall  enforce  the  generation  of  evidence  of  receipt  for  received [assignment: list of information types] at all times. 
+
+FCO_NRR.2.2 The  TSF  shall  be  able  to  relate  the  [assignment:  list  of  attributes]  of  the recipient  of  the  information,  and  the  [assignment:  list  of  information  fields] of the information to which the evidence applies. 
+
+FCO_NRR.2.3 The  TSF  shall  provide  a  capability  to  verify  the  evidence  of  receipt  of information  to  [selection:  originator,  recipient,  [assignment:  list  of  third parties]] given [assignment: limitations on the evidence of receipt]. 
+
+## Class FAU: Security audit
+### Security audit automatic response (FAU_ARP)
+#### FAU_ARP.1  Security alarms
+在TOE检测到安全入侵时，应执行指定的操作。
+
+FAU_ARP.1.1 The  TSF  shall  take  [assignment:  list  of  actions]  upon  detection  of  a potential security violation.  
+
+### Security audit data generation (FAU_GEN)
+#### FAU_GEN.1  Audit data generation
+应记录哪些日志，日志应记录哪些内容。
+
+FAU_GEN.1.1 The  TSF  shall  be  able  to  generate  an  audit  record  of  the  following auditable events:  
++ a) Start-up and shutdown of the audit functions;  
++ b) All  auditable  events  for  the  [selection,  choose  one  of:  minimum, basic, detailed, not specified] level of audit; and  
++ c) [assignment: other specifically defined auditable events].  
+
+FAU_GEN.1.2 The  TSF  shall  record  within  each  audit  record  at  least  the  following information:
++ a) Date  and  time  of  the  event,  type  of  event,  subject  identity  (if applicable), and the outcome (success or failure) of the event; and  
++ b) For each audit event type, based on the auditable event definitions  of  the  functional  components  included  in  the  PP/ST, [assignment: other audit relevant information].
+
+#### FAU_GEN.2  User identity association
+把事件和用户关联。
+
+FAU_GEN.2.1 For audit events resulting from actions of identified users, the TSF shall be  able  to  associate  each  auditable  event  with  the  identity  of  the  user that caused the event.
+
+### Security audit analysis (FAU_SAA)
+#### FAU_SAA.1  Potential violation analysis
+基于规则监控指定的事件，及时发现潜在的对TSF的违背的事件。
+
+FAU_SAA.1.1 The  TSF  shall  be  able  to  apply  a  set  of  rules  in  monitoring  the  audited events  and  based  upon  these  rules  indicate  a  potential  violation  of  the enforcement of the SFRs. 
+
+FAU_SAA.1.2 The TSF shall enforce the following rules for monitoring audited events:  
++ a) Accumulation  or  combination  of  [assignment:  subset  of  defined auditable events] known to indicate a potential security violation;  
++ b) [assignment: any other rules].
+
+#### FAU_SAA.2  Profile based anomaly detection 
+根据用户的怀疑评级以及记录在配置文件里的使用模式去监控异常事件。
+
+FAU_SAA.2.1 The  TSF  shall  be  able  to  maintain  profiles  of  system  usage,  where  an individual  profile  represents  the  historical  patterns  of  usage  performed by the member(s) of [assignment: the profile target group].  
+
+FAU_SAA.2.2 The  TSF  shall  be  able  to  maintain  a  suspicion  rating  associated  with each  user  whose  activity  is  recorded  in  a  profile,  where  the  suspicion rating represents the degree to which the user's current activity is found inconsistent  with  the  established  patterns  of  usage  represented  in  the profile.  
+
+FAU_SAA.2.3 The TSF shall be able to indicate a possible violation of the enforcement of the SFRs when a user's suspicion rating exceeds the following threshold  conditions  [assignment: conditions  under  which  anomalous activity is reported by the TSF].  
+
+#### FAU_SAA.3  Simple attack heuristics 
+根据异常事件的签名去监控系统事件，比较系统活动与异常事件的签名，以发现潜在的对TSF的违背的事件。
+
+FAU_SAA.3.1 The  TSF  shall  be  able  to  maintain  an  internal  representation  of  the following  signature  events  [assignment:  a  subset  of  system  events]  that may indicate a violation of the enforcement of the SFRs.  
+
+FAU_SAA.3.2 The  TSF  shall  be  able  to  compare  the  signature  events  against  the record of system activity discernible from an examination of [assignment: the information to be used to determine system activity].  
+
+FAU_SAA.3.3 The TSF shall be able to indicate a potential violation of the enforcement of  the  SFRs  when  a  system  event  is  found  to  match  a  signature  event that indicates a potential violation of the enforcement of the SFRs.
+
+#### FAU_SAA.4  Complex attack heuristics
+根据入侵场景的事件序列和系统活动做比较，以发现潜在的对TSF的违背的事件。
+
+FAU_SAA.4.1 The TSF shall be able to maintain an internal representation of the following event sequences of known intrusion scenarios [assignment: list of sequences of system events whose occurrence are representative of known penetration  scenarios]  and  the  following  signature  events  [assignment:  a subset  of  system  events]  that  may  indicate  a  potential  violation  of  the enforcement of the SFRs. 
+
+FAU_SAA.4.2 The TSF shall be able to compare the signature events and event sequences against  the  record  of  system  activity  discernible  from  an  examination  of [assignment: the information to be used to determine system activity]. 
+
+FAU_SAA.4.3 The TSF shall be able to indicate a potential violation of the enforcement of the SFRs when system activity is found to match a signature event or event sequence that indicates a potential violation of the enforcement of the SFRs.
+
+### Security audit review (FAU_SAR)
+#### FAU_SAR.1  Audit review
+以合适的形式提供给授权用户审查日志信息。
+
+FAU_SAR.1.1 The TSF shall provide [assignment: authorised users] with the capability to read [assignment: list of audit information] from the audit records.  
+
+FAU_SAR.1.2 The  TSF  shall  provide  the  audit  records  in  a  manner  suitable  for  the user to interpret the information.  
+
+#### FAU_SAR.2  Restricted audit review 
+只对有权限的用户开放日志审查权限。
+
+FAU_SAR.2.1 The TSF shall prohibit all users read access to the audit records, except those users that have been granted explicit read-access.  
+
+#### FAU_SAR.3  Selectable audit review 
+支持基于指定的逻辑对日志的选择或排序功能，比如根据时间先后排序，根据日志敏感等级排序等。
+
+FAU_SAR.3.1 The  TSF  shall  provide  the  ability  to  apply  [assignment:  methods  of selection  and/or  ordering]  of  audit  data  based  on  [assignment:  criteria with logical relations]. 
+
+### Security audit event selection (FAU_SEL)
+#### FAU_SEL.1  Selective audit 
+支持对日志进行选择操作，从所有的日志信息里选择出指定的日志。
+
+FAU_SEL.1.1 The  TSF  shall  be  able  to  select  the  set  of  events  to  be  audited  from  the set of all auditable events based on the following attributes:  
++ a) [selection: object identity, user identity, subject identity, host identity, event type] 
++ b) [assignment:  list  of  additional  attributes  that  audit  selectivity  is based upon]
+
+### Security audit event storage (FAU_STG) 
+#### FAU_STG.1  Protected audit trail storage 
+保护存储的日志记录被未授权删除，检测/阻止对存储的日志记录进行编辑修改。
+
+FAU_STG.1.1 The  TSF  shall  protect  the  stored  audit  records  in  the  audit  trail  from unauthorised deletion.  
+
+FAU_STG.1.2 The  TSF  shall  be  able  to  [selection,  choose  one  of: prevent,  detect] unauthorised modifications to the stored audit records in the audit trail.  
+
+#### FAU_STG.2  Guarantees of audit data availability 
+保障日志信息的可用性，如发现磁盘空间耗尽，发生攻击的情况下，要维持日志的可用性。
+
+FAU_STG.2.1 The TSF shall protect the stored audit records in the audit trail from unauthorised deletion. 
+
+FAU_STG.2.2 The TSF shall be able to [selection, choose one of: prevent, detect] unauthorised modifications to the stored audit records in the audit trail. 
+
+FAU_STG.2.3 The  TSF  shall  ensure  that  [assignment:  metric  for  saving  audit  records] stored  audit  records  will  be  maintained  when  the  following  conditions occur: [selection: audit storage exhaustion, failure, attack]
+
+#### FAU_STG.3  Action in case of possible audit data loss 
+如果日志记录超出了预定的限制，如日志条目限制，日志存储空间限制，日志存储周期限制，导致日志存储失败时，应指定要执行的行动。
+
+FAU_STG.3.1 The  TSF  shall  [assignment:  actions  to  be  taken  in  case  of  possible  audit storage failure] if the audit trail exceeds [assignment: pre-defined limit].  
+
+#### FAU_STG.4  Prevention of audit data loss 
+如果审计跟踪已满（比如定义的日志最多记录1000条，当前已经存储了1000条了），TOE应执行指定的操作，如忽略新的日志时间，覆盖最旧的日志信息等等。
+
+FAU_STG.4.1 The TSF shall [selection, choose one of: “ignore audited events”, “prevent audited  events,  except  those  taken  by  the  authorised  user  with  special rights”, “overwrite the oldest stored audit records”] and [assignment: other actions to be taken in case of audit storage failure] if the audit trail is full.
+
+## Class FPT: Protection of the TSF
+### Fail secure (FPT_FLS)
+#### FPT_FLS.1 Failure with preservation of secure state
+当指定的错误发生时，TOE应保留在安全状态。
+
+FPT_FLS.1.1 The  TSF  shall  preserve  a  secure  state  when  the  following  types  of failures occur: [assignment: list of types of failures in the TSF].
+
+### Availability of exported TSF data (FPT_ITA)
+#### FPT_ITA.1 Inter-TSF availability within a defined availability metric
+保障TSF内部的数据可用性。
+
+FPT_ITA.1.1 The TSF shall ensure the availability of [assignment: list of types of TSF data]  provided  to  another  trusted  IT  product  within  [assignment:  a defined  availability  metric]  given  the  following  conditions  [assignment: conditions to ensure availability].
+
+### Confidentiality of exported TSF data (FPT_ITC)
+#### FPT_ITC.1 Inter-TSF confidentiality during transmission
+保障TSF内部的数据机密性。
+
+FPT_ITC.1.1 The TSF shall protect all TSF data transmitted from the TSF to another trusted IT product from unauthorised disclosure during transmission.
+
+### Integrity of exported TSF data (FPT_ITI)
+#### FPT_ITI.1 Inter-TSF detection of modification
+检测和验证TSF内部的数据完整性的能力。
+
+FPT_ITI.1.1 The  TSF  shall  provide  the  capability  to  detect  modification  of  all  TSF data  during  transmission  between  the  TSF  and  another  trusted  IT product within the following metric: [assignment: a defined modification metric].  
+
+FPT_ITI.1.2 The  TSF  shall  provide  the  capability  to  verify  the  integrity  of  all  TSF data  transmitted  between  the  TSF  and  another  trusted  IT  product  and perform [assignment: action to be taken] if modifications are detected.
+
+#### FPT_ITI.2 Inter-TSF detection and correction of modification
+检测和验证，及纠正TSF内部的数据完整性的能力。
+
+FPT_ITI.2.1 The  TSF  shall  provide  the  capability  to  detect  modification  of  all  TSF  data during  transmission  between  the  TSF  and  another  trusted  IT  product  within the following metric: [assignment: a defined modification metric]. 
+
+FPT_ITI.2.2 The  TSF  shall  provide  the  capability  to  verify  the  integrity  of  all  TSF  data transmitted  between  the  TSF  and  another  trusted  IT  product  and  perform [assignment: action to be taken] if modifications are detected. 
+
+FPT_ITI.2.3 The  TSF  shall  provide  the  capability  to  correct  [assignment:  type  of modification] of all TSF data transmitted between the TSF and another trusted IT product.
+
+### Internal TOE TSF data transfer (FPT_ITT)
+#### FPT_ITT.1 Basic internal TSF data transfer protection
+TSF数据在TOE不同部分进行传输时，应保障数据的机密性和完整性。
+
+FPT_ITT.1.1 The TSF shall protect TSF data from [selection: disclosure, modification] when it is transmitted between separate parts of the TOE. 
+
+#### FPT_ITT.2 TSF data transfer separation
+区分用户数据和TSF数据，保护TSF数据的完整性。
+FPT_ITT.2.1 The  TSF  shall  protect  TSF  data  from  [selection:  disclosure,  modification] when it is transmitted between separate parts of the TOE. 
+
+FPT_ITT.2.2 The  TSF  shall  separate  user  data  from  TSF  data  when  such  data  is transmitted between separate parts of the TOE.
+
+#### FPT_ITT.3 TSF data integrity monitoring 
+监控TSF数据的完整性，一旦检测到TSF数据完整性错误，则执行指定的操作。
+
+FPT_ITT.3.1 The TSF shall be able to detect [selection: modification of data, substitution  of  data,  re-ordering  of  data,  deletion  of  data,  [assignment: other integrity errors]]  for  TSF  data  transmitted  between  separate  parts of the TOE.  
+
+FPT_ITT.3.2 Upon detection of a data integrity error, the TSF shall take the following actions: [assignment: specify the action to be taken]. 
+
+### TSF physical protection (FPT_PHP)
+#### FPT_PHP.1 Passive detection of physical attack 
+拥有判断TOE是否发生物理篡改的能力。
+
+FPT_PHP.1.1 The  TSF  shall  provide  unambiguous  detection  of  physical  tampering that might compromise the TSF.  
+
+FPT_PHP.1.2 The  TSF  shall  provide  the  capability  to  determine  whether  physical tampering with the TSF's devices or TSF's elements has occurred.  
+
+#### FPT_PHP.2 Notification of physical attack 
+当监控到TOE发生物理篡改时，应通知指定的用户/角色。
+
+FPT_PHP.2.1 The  TSF  shall  provide  unambiguous  detection  of  physical  tampering  that might compromise the TSF. 
+
+FPT_PHP.2.2 The TSF shall provide the capability to determine whether physical tampering with the TSF's devices or TSF's elements has occurred.
+
+FPT_PHP.2.3 For [assignment: list of TSF devices/elements for which active detection is required],  the  TSF  shall  monitor  the  devices  and  elements  and  notify [assignment: a designated user or role] when physical tampering with the TSF's devices or TSF's elements has occurred. 
+
+#### FPT_PHP.3 Resistance to physical attack 
+抵抗物理攻击的能力。
+
+FPT_PHP.3.1 The  TSF  shall  resist  [assignment:  physical  tampering  scenarios]  to  the [assignment:  list  of  TSF  devices/elements]  by  responding  automatically such that the SFRs are always enforced.
+
+### Trusted recovery (FPT_RCV)
+#### FPT_RCV.1  Manual recovery 
+当指定的错误发生时，TOE支持手动模式恢复TOE到安全的状态。
+
+FPT_RCV.1.1 After  [assignment:  list  of  failures/service  discontinuities]  the  TSF  shall enter a maintenance mode where the ability to return to a secure state is provided.  
+
+#### FPT_RCV.2  Automated recovery 
+当TOE发生指定的错误时，TOE要么支持自动化恢复，要么不支持自动化恢复但是拥有自动化的恢复流程。
+
+FPT_RCV.2.1 When automated recovery from [assignment: list of failures/service discontinuities]  is  not  possible,  the  TSF  shall  enter  a  maintenance  mode where the ability to return to a secure state is provided. 
+
+FPT_RCV.2.2 For  [assignment:  list  of  failures/service  discontinuities],  the  TSF  shall ensure the return of the TOE to a secure state using automated procedures. 
+
+#### FPT_RCV.3  Automated recovery without undue loss 
+在自动化恢复时，应保障TSF数据的丢失在一个限度之内，且TSF应提供检测哪些对象不可被恢复的能力。
+
+FPT_RCV.3.1 When automated recovery from [assignment: list of failures/service discontinuities]  is  not  possible,  the  TSF  shall  enter  a  maintenance  mode where the ability to return to a secure state is provided. 
+
+FPT_RCV.3.2 For [assignment: list of failures/service discontinuities], the TSF shall ensure the return of the TOE to a secure state using automated procedures. 
+
+FPT_RCV.3.3 The  functions  provided  by  the  TSF  to  recover  from  failure  or  service discontinuity shall ensure that the secure initial state is restored without exceeding  [assignment:  quantification]  for  loss  of  TSF  data  or  objects under the control of the TSF. 
+
+FPT_RCV.3.4 The TSF shall provide the capability to determine the objects that were or were not capable of being recovered. 
+
+#### FPT_RCV.4  Function recovery 
+FPT_RCV.4.1 The  TSF  shall  ensure  that  [assignment:  list  of  functions  and  failure scenarios] have the property that the function either completes successfully, or for the indicated failure scenarios, recovers to a consistent and secure state.
+
+### Replay detection (FPT_RPL)
+#### FPT_RPL.1 Replay detection 
+TSF应拥有检测重放的能力，且检测到重放时，应执行指定的动作。
+
+FPT_RPL.1.1 The TSF shall detect replay for the following entities: [assignment: list of identified entities].  
+
+FPT_RPL.1.2 The TSF shall perform [assignment:  list of specific actions] when replay is detected.
+
+### State synchrony protocol (FPT_SSP) 
+#### FPT_SSP.1 Simple trusted acknowledgement 
+当发生来自TSF其他部分的请求时，TSF应确认其他部分收到的TSF数据是未被改动过的。有点类似tcp的ack包。
+
+FPT_SSP.1.1 The TSF shall acknowledge, when requested by another part of the TSF, the receipt of an unmodified TSF data transmission. 
+
+#### FPT_SSP.2 Mutual trusted acknowledgement 
+TSF应使用确认机制，让TSF的各个相关部分能知晓数据在不同部分传输的正确状态。
+
+FPT_SSP.2.1 The TSF shall acknowledge, when requested by another part of the TSF, the receipt of an unmodified TSF data transmission. 
+
+FPT_SSP.2.2 The  TSF  shall  ensure  that  the  relevant  parts  of  the  TSF  know  the correct status of transmitted data among its different parts, using acknowledgements. 
+
+### Time stamps (FPT_STM)
+#### FPT_STM.1  Reliable time stamps 
+TSF应拥有提供可靠的时间戳的能力。
+
+FPT_STM.1.1 The TSF shall be able to provide reliable time stamps. 
+
+### Inter-TSF TSF data consistency (FPT_TDC)
+#### FPT_TDC.1 Inter-TSF basic TSF data consistency 
+TSF内部的TSF数据一致性解释。（不太理解和完整性确认有什么区别？）
+FPT_TDC.1.1 The TSF shall provide the capability to consistently interpret [assignment:  list  of  TSF  data  types]  when  shared  between  the  TSF  and another trusted IT product.  
+
+FPT_TDC.1.2 The TSF shall use [assignment: list of interpretation rules to be applied by the  TSF]  when  interpreting  the  TSF  data  from  another  trusted  IT product.
+
+### Testing of external entities (FPT_TEE)
+#### FPT_TEE.1 Testing of external entities 
+对外部实体进行测试，当测试失败时，应执行指定的操作。
+
+FPT_TEE.1.1 The  TSF  shall  run  a  suite  of  tests  [selection:  during  initial  start-up, periodically during normal operation, at the request of an authorised user, [assignment:  other  conditions]]  to  check  the  fulfillment  of  [assignment: list of properties of the external entities] .
+
+FPT_TEE.1.2 If the test fails, the TSF shall [assignment: action(s)] .  
+
+### Internal TOE TSF data replication consistency (FPT_TRC)
+#### FPT_TRC.1 Internal TSF consistency 
+当在TOE内部进行TSF数据复制时，应确保TSF数据的一致性。
+
+FPT_TRC.1.1 The TSF shall ensure that TSF data is consistent when replicated between parts of the TOE.  
+
+FPT_TRC.1.2 When parts of the TOE containing replicated TSF data are disconnected, the  TSF  shall  ensure  the  consistency  of  the  replicated  TSF  data  upon reconnection  before  processing  any  requests  for  [assignment: list  of functions dependent on TSF data replication consistency].
+
+### TSF self test (FPT_TST)
+#### FPT_TST.1 TSF testing 
+TSF应执行自测测试，TSF应提供授权用户校验TSF数据的完整性的能力，TSF应提供给授权用户校验TSF完整性的能力。
+
+FPT_TST.1.1 The  TSF  shall  run  a  suite  of  self  tests  [selection:  during  initial  start-up, periodically during normal operation, at the request of the authorised user, at  the  conditions[assignment:  conditions  under  which  self  test  should occur]]  to  demonstrate  the  correct  operation  of  [selection:  [assignment: parts of TSF], the TSF].  
+
+FPT_TST.1.2 The TSF shall provide authorised users with the capability to verify the integrity of [selection: [assignment: parts of TSF data], TSF data].  
+
+FPT_TST.1.3 The TSF shall provide authorised users with the capability to verify the integrity of [selection: [assignment: parts of TSF], TSF].
+
+## 组件依赖关系表
+标识为“X”代表直接依赖，标识为“O”代表可选依赖，标识为"-"代表间接依赖。可选依赖的模块也会改变间接依赖的模块，所以间接依赖并非强制依赖。
+
+### Cryptographic_support
+![](http://kafroc.github.io/assets/img/CC_Cryptographic_support.jpg)
+
+### Identification_and_authentication
+![](http://kafroc.github.io/assets/img/CC_Identification_and_authentication.jpg)
+
+### Privacy
+![](http://kafroc.github.io/assets/img/CC_Privacy.jpg)
+
+### TOE_access
+![](http://kafroc.github.io/assets/img/CC_TOE_access.jpg)
+
+### Resource_utilisation
+![](http://kafroc.github.io/assets/img/CC_Resource_utilisation.jpg)
+
+### User_data_protection
+![](http://kafroc.github.io/assets/img/CC_User_data_protection.jpg)
+
+### Security_management
+![](http://kafroc.github.io/assets/img/CC_Security_management.jpg)
+
+### Communication
+![](http://kafroc.github.io/assets/img/CC_Communication.jpg)
+
+### Security_audit
+![](http://kafroc.github.io/assets/img/CC_Security_audit.jpg)
+
+### Protection_of_the_TSF
+![](http://kafroc.github.io/assets/img/CC_Protection_of_the_TSF.jpg)
+
+## 参考文献
+[1] [CCPART1V3.1R5.pdf](https://www.commoncriteriaportal.org/files/ccfiles/CCPART1V3.1R5.pdf)<br>
+[2] [CCPART2V3.1R5.pdf](https://www.commoncriteriaportal.org/files/ccfiles/CCPART2V3.1R5.pdf)
