@@ -99,13 +99,15 @@ NIST的定义：A measure of the extent to which an entity is threatened by a po
 我的理解是风险管理是安全的终点，所有的安全问题都汇总到风险管理进行决策。
 
 风险的计算可以参考以下公式[5]：
+```
 Risk = C * SUM(i from 1 to n; V[i] * E[i])
 C = Criticality of the asset
 V[i] = Vulnerability of the asset to threat number i,
 E[i] = Consequences (represented by the term “Effects” to avoid confusing it with Criticality) to the asset from threat number i
 n = Total number of threats defined for the asset. The summation is taken over all threats (numbers 1 to n).
+```
 
-我认为V*E不如用T*E，T代表威胁，这样能更清晰的代表风险。因为当个漏洞可能可以造成多种威胁，也可能多个漏洞才能造成一个威胁，威胁比漏洞分开计算误差更小。
+我认为V\*E不如用T\*E，T代表威胁，这样能更清晰的代表风险。因为当个漏洞可能可以造成多种威胁，也可能多个漏洞才能造成一个威胁，威胁比漏洞分开计算误差更小。
 
 那上述例子来说，当拒绝服务发生时，损失的期望是多少，当发生密码泄露时，损失的期望时多少，相对会比较具体。而仅对缓冲区溢出漏洞进行评估（比如用DREAD模型），比较而言就会模糊一些。
 
@@ -114,7 +116,7 @@ n = Total number of threats defined for the asset. The summation is taken over a
 
 ## 参考资料
 [1] https://csrc.nist.gov/glossary/term/risk
-[2]	https://cwe.mitre.org/data/index.html
+[2] https://cwe.mitre.org/data/index.html
 [3] https://capec.mitre.org/data/index.html
 [4] https://www.cve.org/
 [5] Threat and vulnerability risk assessment for existing subway stations: A simplified approach
