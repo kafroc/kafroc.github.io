@@ -115,8 +115,8 @@ n = Total number of threats defined for the asset. The summation is taken over a
 
 
 ## 参考资料
-[1] https://csrc.nist.gov/glossary/term/risk
-[2] https://cwe.mitre.org/data/index.html
-[3] https://capec.mitre.org/data/index.html
-[4] https://www.cve.org/
+[1] https://csrc.nist.gov/glossary/term/risk<br>
+[2] https://cwe.mitre.org/data/index.html<br>
+[3] https://capec.mitre.org/data/index.html<br>
+[4] https://www.cve.org/<br>
 [5] Threat and vulnerability risk assessment for existing subway stations: A simplified approach
